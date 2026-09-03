@@ -16,7 +16,7 @@ local RootPart = Character:WaitForChild("HumanoidRootPart")
 -- CONFIG
 --==========================================================
 local CONFIG = {
-	BACKEND_URL = "https://YOUR-RAILWAY-URL.up.railway.app/api/chat", -- ← THAY URL THẬT
+	BACKEND_URL = "https://forget-ai.onrender.com/api/chat", -- my backend url (You can replace it with your backend URL if you want) :v
 
 	FOLLOW_DISTANCE = 6,
 	TELEPORT_DISTANCE = 60,
