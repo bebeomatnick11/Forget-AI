@@ -1,0 +1,19 @@
+# Secrets
+.env
+.env.*
+!.env.example
+secrets.*
+config.local.*
+*.pem
+*.key
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
