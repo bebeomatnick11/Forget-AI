@@ -1,24 +1,10 @@
--- I will not obfuscate this script
--- You can take ideas from this script, but you must definitely give credit.
---[[
-============================================================
-ROBLOX AI COMPANION — FULL LOCALSCRIPT (SECURE + PERSONALIZATION)
-============================================================
-HƯỚNG DẪN:
-1. StarterPlayer → StarterPlayerScripts → LocalScript tên AICompanion
-2. Dán toàn bộ code này
-3. Sửa BACKEND_URL bên dưới
-4. Game Settings → Security → Allow HTTP Requests = true
-============================================================
-]]
+-- I won't obfuscate this script, but if you use it as an idea or... without giving credit, I will:/
+-- If you have given credit to me [bebeomatnick/Ng'ĐzBthg (on tiktok)], then I would like to thank you.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local PathfindingService = game:GetService("PathfindingService")
 local HttpService = game:GetService("HttpService")
-local TextService = game:GetService("TextService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -30,10 +16,8 @@ local RootPart = Character:WaitForChild("HumanoidRootPart")
 -- CONFIG
 --==========================================================
 local CONFIG = {
-	BACKEND_URL = "https://YOUR-BACKEND-DOMAIN.com/api/chat", -- ← THAY BẰNG URL BACKEND CỦA BẠN
-	MODEL = "grok-4.5",
+	BACKEND_URL = "https://YOUR-RAILWAY-URL.up.railway.app/api/chat", -- ← THAY URL THẬT
 
-	AI_NAME = LocalPlayer.Name .. "'s AI",
 	FOLLOW_DISTANCE = 6,
 	TELEPORT_DISTANCE = 60,
 	PATH_UPDATE_INTERVAL = 0.85,
@@ -44,34 +28,35 @@ local CONFIG = {
 }
 
 --==========================================================
--- PERSONALIZATION DATA
+-- PERSONALIZATION
 --==========================================================
 local Personalization = {
-	Name = CONFIG.AI_NAME,
-	Personality = "Trung lập", -- Vui vẻ | Nghiêm túc | Hài hước | Hỗ trợ | Trung lập
-	FollowDistance = 6,
-	ResponseStyle = "Tự nhiên",
+	Name = LocalPlayer.Name .. "'s AI",
+	Personality = "Trung lập",
+	Language = "Tiếng Việt", -- "Tiếng Việt" | "English"
 }
 
 local PersonalityPrompts = {
-	["Vui vẻ"] = "Bạn rất vui vẻ, nhiệt tình, hay dùng emoji và luôn tích cực.",
+	["Vui vẻ"]     = "Bạn rất vui vẻ, nhiệt tình, hay dùng emoji và luôn tích cực.",
 	["Nghiêm túc"] = "Bạn nói chuyện nghiêm túc, ngắn gọn, lịch sự và chuyên nghiệp.",
-	["Hài hước"] = "Bạn rất hài hước, thích đùa nhẹ, dùng meme và cách nói dí dỏm.",
-	["Hỗ trợ"] = "Bạn luôn sẵn sàng giúp đỡ, giải thích rõ ràng, kiên nhẫn và thân thiện.",
-	["Trung lập"] = "Bạn nói chuyện tự nhiên, cân bằng giữa thân thiện và rõ ràng.",
+	["Hài hước"]   = "Bạn rất hài hước, thích đùa nhẹ, dùng meme và cách nói dí dỏm.",
+	["Hỗ trợ"]     = "Bạn luôn sẵn sàng giúp đỡ, giải thích rõ ràng, kiên nhẫn và thân thiện.",
+	["Trung lập"]  = "Bạn nói chuyện tự nhiên, cân bằng giữa thân thiện và rõ ràng.",
 }
 
--- Load saved preferences
+local LanguagePrompts = {
+	["Tiếng Việt"] = "Bạn phải trả lời hoàn toàn bằng tiếng Việt.",
+	["English"]    = "You must reply entirely in English.",
+}
+
 local function LoadPersonalization()
-	local success, data = pcall(function()
+	local ok, data = pcall(function()
 		return HttpService:JSONDecode(LocalPlayer:GetAttribute("AI_Personalization") or "")
 	end)
-	if success and type(data) == "table" then
+	if ok and type(data) == "table" then
 		for k, v in pairs(data) do
 			Personalization[k] = v
 		end
-		CONFIG.AI_NAME = Personalization.Name or CONFIG.AI_NAME
-		CONFIG.FOLLOW_DISTANCE = Personalization.FollowDistance or 6
 	end
 end
 
@@ -86,24 +71,29 @@ LoadPersonalization()
 --==========================================================
 -- STATE
 --==========================================================
-local AICharacter, AIHumanoid, AIRoot, AIAnimator = nil, nil, nil, nil
+local AICharacter, AIHumanoid, AIRoot, AIAnimator
 local IsFollowing, IsMoving, IsThinking = false, false, false
-local CurrentPath, Waypoints, WaypointIndex = nil, {}, 1
 local LastBubbleTime, LastPosition, StuckTimer = 0, nil, 0
 local ChatHistory, Memory, CurrentAction = {}, {}, "IDLE"
-local Connections = {}
 local CurrentBubble = nil
+local Connections = {}
 
 --==========================================================
 -- UTILS
 --==========================================================
 local function SafeDestroy(obj)
-	if obj and obj.Parent then pcall(function() obj:Destroy() end) end
+	if obj and obj.Parent then
+		pcall(function()
+			obj:Destroy()
+		end)
+	end
 end
 
 local function Create(class, props)
 	local obj = Instance.new(class)
-	for k, v in pairs(props or {}) do obj[k] = v end
+	for k, v in pairs(props or {}) do
+		obj[k] = v
+	end
 	return obj
 end
 
@@ -114,15 +104,13 @@ local AnimationTracks = {}
 local CurrentAnimState = "Idle"
 
 local DefaultAnims = {
-	Idle = "rbxassetid://507766666",
-	Walk = "rbxassetid://507777826",
-	Run = "rbxassetid://507767714",
-	Jump = "rbxassetid://507765000",
-	Fall = "rbxassetid://507767968",
+	Idle  = "rbxassetid://507766666",
+	Walk  = "rbxassetid://507777826",
+	Run   = "rbxassetid://507767714",
+	Jump  = "rbxassetid://507765000",
+	Fall  = "rbxassetid://507767968",
 	Climb = "rbxassetid://507765644",
-	Sit = "rbxassetid://507768133",
-	Swim = "rbxassetid://913384386",
-	SwimIdle = "rbxassetid://913390859",
+	Sit   = "rbxassetid://507768133",
 }
 
 local function LoadAnimations(animator)
@@ -130,10 +118,12 @@ local function LoadAnimations(animator)
 	for name, id in pairs(DefaultAnims) do
 		local anim = Instance.new("Animation")
 		anim.AnimationId = id
-		local ok, track = pcall(function() return animator:LoadAnimation(anim) end)
+		local ok, track = pcall(function()
+			return animator:LoadAnimation(anim)
+		end)
 		if ok and track then
 			track.Priority = Enum.AnimationPriority.Movement
-			if name == "Idle" or name == "Walk" or name == "Run" or name == "Swim" or name == "SwimIdle" then
+			if name == "Idle" or name == "Walk" or name == "Run" then
 				track.Looped = true
 			end
 			AnimationTracks[name] = track
@@ -142,7 +132,9 @@ local function LoadAnimations(animator)
 end
 
 local function PlayAnim(name, fade)
-	if not AnimationTracks[name] or CurrentAnimState == name then return end
+	if not AnimationTracks[name] or CurrentAnimState == name then
+		return
+	end
 	if AnimationTracks[CurrentAnimState] and AnimationTracks[CurrentAnimState].IsPlaying then
 		AnimationTracks[CurrentAnimState]:Stop(fade or 0.2)
 	end
@@ -151,77 +143,91 @@ local function PlayAnim(name, fade)
 end
 
 local function UpdateAnimation()
-	if not AIHumanoid or not AIRoot then return end
+	if not AIHumanoid or not AIRoot then
+		return
+	end
 	local state = AIHumanoid:GetState()
 	local speed = AIRoot.AssemblyLinearVelocity.Magnitude
 
-	if state == Enum.HumanoidStateType.Jumping then PlayAnim("Jump")
-	elseif state == Enum.HumanoidStateType.Freefall then PlayAnim("Fall")
-	elseif state == Enum.HumanoidStateType.Climbing then PlayAnim("Climb")
-	elseif state == Enum.HumanoidStateType.Swimming then
-		PlayAnim(speed > 2 and "Swim" or "SwimIdle")
-	elseif state == Enum.HumanoidStateType.Seated then PlayAnim("Sit")
-	elseif speed > 16 then PlayAnim("Run")
-	elseif speed > 1 then PlayAnim("Walk")
-	else PlayAnim("Idle") end
+	if state == Enum.HumanoidStateType.Jumping then
+		PlayAnim("Jump")
+	elseif state == Enum.HumanoidStateType.Freefall then
+		PlayAnim("Fall")
+	elseif state == Enum.HumanoidStateType.Climbing then
+		PlayAnim("Climb")
+	elseif state == Enum.HumanoidStateType.Seated then
+		PlayAnim("Sit")
+	elseif speed > 16 then
+		PlayAnim("Run")
+	elseif speed > 1 then
+		PlayAnim("Walk")
+	else
+		PlayAnim("Idle")
+	end
 end
 
 --==========================================================
 -- CREATE AI CHARACTER
 --==========================================================
 local function CreateAICharacter()
-	if AICharacter then SafeDestroy(AICharacter) end
+	if AICharacter then
+		SafeDestroy(AICharacter)
+	end
 
 	local source = LocalPlayer.Character
-	if not source then return end
+	if not source then
+		return
+	end
 
-	local success, cloned = pcall(function() return source:Clone() end)
-	if not success or not cloned then
-		warn("[AI] Không clone được character")
+	local ok, cloned = pcall(function()
+		return source:Clone()
+	end)
+	if not ok or not cloned then
 		return
 	end
 
 	cloned.Name = Personalization.Name
 	cloned.Parent = workspace
 
-	for _, desc in ipairs(cloned:GetDescendants()) do
-		if desc:IsA("LocalScript") or desc:IsA("Script") or desc:IsA("Tool") then
-			desc:Destroy()
+	for _, d in ipairs(cloned:GetDescendants()) do
+		if d:IsA("LocalScript") or d:IsA("Script") or d:IsA("Tool") then
+			d:Destroy()
 		end
 	end
 
-	local clonedHum = cloned:FindFirstChildOfClass("Humanoid")
-	local clonedRoot = cloned:FindFirstChild("HumanoidRootPart")
-	if not clonedHum or not clonedRoot then
+	local hum = cloned:FindFirstChildOfClass("Humanoid")
+	local root = cloned:FindFirstChild("HumanoidRootPart")
+	if not hum or not root then
 		SafeDestroy(cloned)
 		return
 	end
 
-	clonedHum.DisplayName = Personalization.Name
-	clonedHum.Health = 100
-	clonedHum.MaxHealth = 100
-	clonedHum.WalkSpeed = 16
-	clonedHum.JumpPower = 50
+	hum.DisplayName = Personalization.Name
+	hum.Health = 100
+	hum.MaxHealth = 100
+	hum.WalkSpeed = 16
+	hum.JumpPower = 50
 
 	local oldAnimate = cloned:FindFirstChild("Animate")
-	if oldAnimate then oldAnimate:Destroy() end
+	if oldAnimate then
+		oldAnimate:Destroy()
+	end
 
-	local anim = clonedHum:FindFirstChildOfClass("Animator") or Instance.new("Animator", clonedHum)
+	local anim = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
 
-	local offset = Vector3.new(4, 0, 0)
-	clonedRoot.CFrame = source.HumanoidRootPart.CFrame * CFrame.new(offset)
-
-	pcall(function() clonedRoot:SetNetworkOwner(LocalPlayer) end)
+	root.CFrame = source.HumanoidRootPart.CFrame * CFrame.new(4, 0, 0)
+	pcall(function()
+		root:SetNetworkOwner(LocalPlayer)
+	end)
 
 	AICharacter = cloned
-	AIHumanoid = clonedHum
-	AIRoot = clonedRoot
+	AIHumanoid = hum
+	AIRoot = root
 	AIAnimator = anim
 
 	LoadAnimations(AIAnimator)
 	PlayAnim("Idle")
 
-	-- Name tag
 	local billboard = Create("BillboardGui", {
 		Name = "AINameTag",
 		Size = UDim2.new(0, 200, 0, 40),
@@ -246,11 +252,17 @@ end
 --==========================================================
 local function ShowBubble(text, duration)
 	duration = duration or 4
-	if tick() - LastBubbleTime < CONFIG.BUBBLE_COOLDOWN then return end
+	if tick() - LastBubbleTime < CONFIG.BUBBLE_COOLDOWN then
+		return
+	end
 	LastBubbleTime = tick()
 
-	if CurrentBubble then SafeDestroy(CurrentBubble) end
-	if not AIRoot then return end
+	if CurrentBubble then
+		SafeDestroy(CurrentBubble)
+	end
+	if not AIRoot then
+		return
+	end
 
 	local billboard = Create("BillboardGui", {
 		Name = "AIBubble",
@@ -294,34 +306,46 @@ local function ShowBubble(text, duration)
 	end)
 end
 
-local function ShowThinkingBubble(stage)
-	if stage == 1 then ShowBubble("🤔 Đang suy nghĩ...", 8)
-	elseif stage == 2 then ShowBubble("🤔 Đang phân tích...", 10)
-	else ShowBubble("...", 6) end
+local function ShowThinkingBubble()
+	ShowBubble("🤔 Đang suy nghĩ...", 8)
 end
 
 --==========================================================
 -- PATHFINDING + FOLLOW
 --==========================================================
 local function ComputePath(targetPos)
-	if not AIRoot then return nil end
+	if not AIRoot then
+		return nil
+	end
 	local path = PathfindingService:CreatePath({
-		AgentRadius = 2, AgentHeight = 5, AgentCanJump = true, AgentCanClimb = true, WaypointSpacing = 4
+		AgentRadius = 2,
+		AgentHeight = 5,
+		AgentCanJump = true,
+		AgentCanClimb = true,
+		WaypointSpacing = 4,
 	})
-	local ok = pcall(function() path:ComputeAsync(AIRoot.Position, targetPos) end)
-	if ok and path.Status == Enum.PathStatus.Success then return path end
+	local ok = pcall(function()
+		path:ComputeAsync(AIRoot.Position, targetPos)
+	end)
+	if ok and path.Status == Enum.PathStatus.Success then
+		return path
+	end
 	return nil
 end
 
 local function FollowPlayer()
-	if not IsFollowing or not AIRoot or not RootPart then return end
+	if not IsFollowing or not AIRoot or not RootPart then
+		return
+	end
 	local dist = (AIRoot.Position - RootPart.Position).Magnitude
 
 	if dist >= CONFIG.TELEPORT_DISTANCE then
 		local offset = RootPart.CFrame.RightVector * 4 + Vector3.new(0, 0, -2)
 		local safePos = RootPart.Position + offset
 		local ray = workspace:Raycast(safePos + Vector3.new(0, 10, 0), Vector3.new(0, -30, 0))
-		if ray then safePos = ray.Position + Vector3.new(0, 3, 0) end
+		if ray then
+			safePos = ray.Position + Vector3.new(0, 3, 0)
+		end
 		AIRoot.CFrame = CFrame.new(safePos)
 		AIHumanoid:MoveTo(RootPart.Position)
 		return
@@ -336,10 +360,9 @@ local function FollowPlayer()
 	local target = RootPart.Position - (RootPart.CFrame.LookVector * 2)
 	local path = ComputePath(target)
 	if path then
-		CurrentPath = path
-		Waypoints = path:GetWaypoints()
-		if #Waypoints > 1 then
-			AIHumanoid:MoveTo(Waypoints[2].Position)
+		local waypoints = path:GetWaypoints()
+		if #waypoints > 1 then
+			AIHumanoid:MoveTo(waypoints[2].Position)
 			IsMoving = true
 		end
 	else
@@ -349,8 +372,14 @@ local function FollowPlayer()
 end
 
 local function CheckStuck()
-	if not AIRoot or not IsFollowing then return end
-	if not LastPosition then LastPosition = AIRoot.Position return end
+	if not AIRoot or not IsFollowing then
+		return
+	end
+	if not LastPosition then
+		LastPosition = AIRoot.Position
+		return
+	end
+
 	local moved = (AIRoot.Position - LastPosition).Magnitude
 	LastPosition = AIRoot.Position
 
@@ -371,40 +400,46 @@ end
 -- ACTION CONTROLLER
 --==========================================================
 local ValidActions = {
-	FOLLOW_PLAYER = true, STOP = true, JUMP = true, SIT = true,
-	TELEPORT_NEAR = true, SAY = true, IDLE = true
+	FOLLOW_PLAYER = true,
+	STOP = true,
+	JUMP = true,
+	SIT = true,
+	TELEPORT_NEAR = true,
+	SAY = true,
+	IDLE = true,
 }
 
-local function ExecuteAction(actionData)
-	if type(actionData) \~= "table" then return end
-	local action = tostring(actionData.action or ""):upper()
-	if not ValidActions[action] then return end
+local function ExecuteAction(actionName)
+	local action = tostring(actionName or ""):upper()
+	if not ValidActions[action] then
+		return
+	end
 	CurrentAction = action
 
 	if action == "FOLLOW_PLAYER" then
 		IsFollowing = true
-		ShowBubble("Được, tôi đi theo bạn!", 3)
+		ShowBubble(Personalization.Language == "English" and "Okay, I'll follow you!" or "Được, tôi đi theo bạn!", 3)
 		FollowPlayer()
 	elseif action == "STOP" then
 		IsFollowing = false
 		IsMoving = false
-		if AIHumanoid then AIHumanoid:MoveTo(AIRoot.Position) end
-		ShowBubble("Ok, tôi dừng lại.", 3)
+		if AIHumanoid then
+			AIHumanoid:MoveTo(AIRoot.Position)
+		end
+		ShowBubble(Personalization.Language == "English" and "Okay, I'll stop." or "Ok, tôi dừng lại.", 3)
 	elseif action == "JUMP" then
-		if AIHumanoid then AIHumanoid.Jump = true end
-		ShowBubble("Nhảy!", 2)
+		if AIHumanoid then
+			AIHumanoid.Jump = true
+		end
+		ShowBubble(Personalization.Language == "English" and "Jump!" or "Nhảy!", 2)
 	elseif action == "SIT" then
-		if AIHumanoid then AIHumanoid.Sit = true end
-		ShowBubble("Ngồi đây.", 3)
+		if AIHumanoid then
+			AIHumanoid.Sit = true
+		end
+		ShowBubble(Personalization.Language == "English" and "Sitting down." or "Ngồi đây.", 3)
 	elseif action == "TELEPORT_NEAR" then
 		if RootPart and AIRoot then
 			AIRoot.CFrame = CFrame.new(RootPart.Position + RootPart.CFrame.RightVector * 3)
-		end
-	elseif action == "SAY" then
-		local msg = actionData.message or actionData.text or ""
-		if msg \~= "" then
-			ShowBubble(msg, 5)
-			AddChatMessage("AI", msg)
 		end
 	elseif action == "IDLE" then
 		IsFollowing = false
@@ -413,63 +448,93 @@ local function ExecuteAction(actionData)
 end
 
 --==========================================================
--- AI BRAIN (SECURE BACKEND)
+-- AI BRAIN (FINAL SYNCED VERSION)
 --==========================================================
 local function BuildContext()
 	return {
 		playerName = LocalPlayer.Name,
 		aiName = Personalization.Name,
 		personality = Personalization.Personality,
-		playerPos = RootPart and {x = math.floor(RootPart.Position.X), y = math.floor(RootPart.Position.Y), z = math.floor(RootPart.Position.Z)} or nil,
-		aiPos = AIRoot and {x = math.floor(AIRoot.Position.X), y = math.floor(AIRoot.Position.Y), z = math.floor(AIRoot.Position.Z)} or nil,
+		language = Personalization.Language,
+		playerPos = RootPart and {
+			x = math.floor(RootPart.Position.X),
+			y = math.floor(RootPart.Position.Y),
+			z = math.floor(RootPart.Position.Z)
+		} or nil,
+		aiPos = AIRoot and {
+			x = math.floor(AIRoot.Position.X),
+			y = math.floor(AIRoot.Position.Y),
+			z = math.floor(AIRoot.Position.Z)
+		} or nil,
 		distance = (RootPart and AIRoot) and math.floor((RootPart.Position - AIRoot.Position).Magnitude) or nil,
 		isFollowing = IsFollowing,
 		currentAction = CurrentAction,
-		memory = Memory,
 	}
 end
 
-local function CallAI(userMessage, isFeedback)
-	if IsThinking then return end
+local function CallAI(userMessage)
+	if IsThinking then
+		return
+	end
 	IsThinking = true
-	ShowThinkingBubble(1)
+
+	ShowThinkingBubble()
 
 	local context = BuildContext()
+
+	local languageInstruction = LanguagePrompts[Personalization.Language] or LanguagePrompts["Tiếng Việt"]
 	local personalityText = PersonalityPrompts[Personalization.Personality] or PersonalityPrompts["Trung lập"]
 
-	local systemPrompt = string.format([[
-Bạn là AI Companion trong Roblox. Tên bạn là %s.
-Bạn đang chơi cùng người chơi tên %s.
+	local instruction = string.format([[
+Bạn là AI Companion trong Roblox tên "%s".
 
-Tính cách hiện tại của bạn: %s
+Tính cách:
 %s
 
-Bạn PHẢI trả lời bằng JSON duy nhất:
+%s
+
+Bạn PHẢI trả về DUY NHẤT một JSON hợp lệ.
+Không markdown.
+Không ```json.
+Không giải thích bên ngoài JSON.
+
+Định dạng chính xác:
+
 {
-  "reply": "câu trả lời bằng tiếng Việt ngắn gọn, tự nhiên",
-  "action": "TÊN_ACTION"
+  "reply": "câu trả lời ngắn gọn",
+  "action": "ACTION"
 }
 
-Các action hợp lệ: FOLLOW_PLAYER, STOP, JUMP, SIT, TELEPORT_NEAR, SAY, IDLE
+Các action hợp lệ:
 
-Context:
+FOLLOW_PLAYER
+STOP
+JUMP
+SIT
+TELEPORT_NEAR
+SAY
+IDLE
+
+Quy tắc action:
+
+- Người chơi bảo đi theo → FOLLOW_PLAYER
+- Người chơi bảo dừng → STOP
+- Người chơi bảo nhảy → JUMP
+- Người chơi bảo ngồi → SIT
+- Người chơi bảo lại gần/teleport → TELEPORT_NEAR
+- Chỉ trò chuyện bình thường → SAY
+- Không cần hành động → IDLE
+
+Không được tạo action khác.
+
+Người chơi nói:
 %s
-]], Personalization.Name, LocalPlayer.Name, Personalization.Personality, personalityText, HttpService:JSONEncode(context))
-
-	local messages = {{role = "system", content = systemPrompt}}
-	for _, h in ipairs(ChatHistory) do
-		table.insert(messages, {
-			role = h.role == "You" and "user" or "assistant",
-			content = h.text
-		})
-	end
-	table.insert(messages, {role = "user", content = userMessage})
+]], Personalization.Name, personalityText, languageInstruction, userMessage)
 
 	local body = {
-		model = CONFIG.MODEL,
-		messages = messages,
-		temperature = 0.7,
-		max_tokens = 400,
+		message = instruction,
+		playerId = tostring(LocalPlayer.UserId),
+		context = HttpService:JSONEncode(context),
 	}
 
 	local success, response = pcall(function()
@@ -478,7 +543,6 @@ Context:
 			Method = "POST",
 			Headers = {
 				["Content-Type"] = "application/json",
-				["X-Roblox-Player"] = tostring(LocalPlayer.UserId),
 			},
 			Body = HttpService:JSONEncode(body),
 		})
@@ -486,47 +550,136 @@ Context:
 
 	IsThinking = false
 
-	if not success or not response or response.StatusCode \~= 200 then
-		ShowBubble("Xin lỗi, tôi không kết nối được server.", 4)
-		AddChatMessage("AI", "Xin lỗi, lỗi kết nối backend.")
+	if not success or not response then
+		ShowBubble("❌ Không kết nối được AI server.", 4)
+		AddChatMessage("AI", "Lỗi kết nối backend.")
 		return
 	end
 
-	local ok, decoded = pcall(function() return HttpService:JSONDecode(response.Body) end)
-	if not ok or not decoded or not decoded.choices or not decoded.choices[1] then
-		ShowBubble("Lỗi xử lý phản hồi.", 3)
+	if response.StatusCode \~= 200 then
+		local serverError = "Backend HTTP " .. tostring(response.StatusCode)
+
+		local errorOk, errorData = pcall(function()
+			return HttpService:JSONDecode(response.Body)
+		end)
+
+		if errorOk and type(errorData) == "table" then
+			serverError = tostring(errorData.error or serverError)
+		end
+
+		ShowBubble("❌ " .. serverError, 5)
+		AddChatMessage("AI", serverError)
 		return
 	end
 
-	local content = decoded.choices[1].message.content
-	local actionData
-	local parseOk, parsed = pcall(function()
-		local jsonStr = content:match("%{.-%}")
-		if jsonStr then return HttpService:JSONDecode(jsonStr) end
-		return {reply = content, action = "SAY"}
+	local decodeOk, decoded = pcall(function()
+		return HttpService:JSONDecode(response.Body)
 	end)
 
-	actionData = (parseOk and parsed) and parsed or {reply = content, action = "SAY"}
-	local reply = actionData.reply or actionData.message or "..."
+	if not decodeOk or type(decoded) \~= "table" then
+		ShowBubble("❌ Backend trả dữ liệu không hợp lệ.", 4)
+		AddChatMessage("AI", "Phản hồi backend không hợp lệ.")
+		return
+	end
 
-	if #Memory > 8 then table.remove(Memory, 1) end
-	table.insert(Memory, {user = userMessage, ai = reply})
+	if decoded.ok \~= true then
+		local err = tostring(decoded.error or "AI gặp lỗi.")
+		ShowBubble("❌ " .. err, 4)
+		AddChatMessage("AI", err)
+		return
+	end
 
-	AddChatMessage("AI", reply, true) -- true = hiện nút góp ý
+	local rawReply = tostring(decoded.reply or "")
+
+	if rawReply == "" then
+		ShowBubble("AI không trả lời.", 3)
+		AddChatMessage("AI", "Không nhận được câu trả lời.")
+		return
+	end
+
+	--======================================================
+	-- PARSE AI JSON
+	--======================================================
+	local actionData = {
+		reply = rawReply,
+		action = "SAY",
+	}
+
+	local parseOk, parsed = pcall(function()
+		return HttpService:JSONDecode(rawReply)
+	end)
+
+	if parseOk and type(parsed) == "table" then
+		if parsed.reply \~= nil then
+			actionData.reply = tostring(parsed.reply)
+		end
+		if parsed.action \~= nil then
+			actionData.action = tostring(parsed.action):upper()
+		end
+	else
+		local jsonStr = rawReply:match("{.*}")
+		if jsonStr then
+			local retryOk, retryParsed = pcall(function()
+				return HttpService:JSONDecode(jsonStr)
+			end)
+			if retryOk and type(retryParsed) == "table" then
+				if retryParsed.reply \~= nil then
+					actionData.reply = tostring(retryParsed.reply)
+				end
+				if retryParsed.action \~= nil then
+					actionData.action = tostring(retryParsed.action):upper()
+				end
+			end
+		end
+	end
+
+	--======================================================
+	-- VALIDATE ACTION
+	--======================================================
+	if not ValidActions[actionData.action] then
+		actionData.action = "SAY"
+	end
+
+	local reply = actionData.reply
+	local action = actionData.action
+
+	--======================================================
+	-- MEMORY
+	--======================================================
+	if #Memory >= 8 then
+		table.remove(Memory, 1)
+	end
+	table.insert(Memory, {
+		user = userMessage,
+		ai = reply,
+	})
+
+	--======================================================
+	-- DISPLAY
+	--======================================================
+	AddChatMessage("AI", reply, true)
 	ShowBubble(reply, 5)
-	ExecuteAction(actionData)
+
+	--======================================================
+	-- ACTION
+	--======================================================
+	ExecuteAction(action)
 end
 
 --==========================================================
--- CHAT UI + PERSONALIZATION + FEEDBACK
+-- UI + PERSONALIZATION + LANGUAGE
 --==========================================================
 local ScreenGui, MainFrame, ChatScroll, InputBox, SendBtn, ToggleBtn, StatusLabel
-local SettingsFrame = nil
+local SettingsFrame
 
 local function AddChatMessage(role, text, showFeedback)
 	table.insert(ChatHistory, {role = role, text = text})
-	if #ChatHistory > CONFIG.MAX_HISTORY then table.remove(ChatHistory, 1) end
-	if not ChatScroll then return end
+	if #ChatHistory > CONFIG.MAX_HISTORY then
+		table.remove(ChatHistory, 1)
+	end
+	if not ChatScroll then
+		return
+	end
 
 	local msgFrame = Create("Frame", {
 		Size = UDim2.new(1, -8, 0, 0),
@@ -548,45 +701,43 @@ local function AddChatMessage(role, text, showFeedback)
 		Parent = msgFrame
 	})
 
-	-- Nút góp ý
 	if showFeedback and role == "AI" then
-		local feedbackFrame = Create("Frame", {
+		local fb = Create("Frame", {
 			Size = UDim2.new(1, 0, 0, 28),
 			BackgroundTransparency = 1,
 			Parent = msgFrame
 		})
 
-		local likeBtn = Create("TextButton", {
+		local like = Create("TextButton", {
 			Size = UDim2.new(0, 50, 0, 24),
 			Position = UDim2.new(0, 0, 0, 2),
 			BackgroundColor3 = Color3.fromRGB(40, 80, 50),
 			Text = "👍",
 			TextSize = 16,
-			Font = Enum.Font.Gotham,
-			Parent = feedbackFrame
+			Parent = fb
 		})
-		Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = likeBtn})
+		Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = like})
 
-		local dislikeBtn = Create("TextButton", {
+		local dislike = Create("TextButton", {
 			Size = UDim2.new(0, 50, 0, 24),
 			Position = UDim2.new(0, 56, 0, 2),
 			BackgroundColor3 = Color3.fromRGB(80, 40, 40),
 			Text = "👎",
 			TextSize = 16,
-			Font = Enum.Font.Gotham,
-			Parent = feedbackFrame
+			Parent = fb
 		})
-		Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = dislikeBtn})
+		Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = dislike})
 
-		likeBtn.MouseButton1Click:Connect(function()
-			likeBtn.Text = "✅"
-			dislikeBtn.Visible = false
-			-- Gửi feedback tích cực (có thể mở rộng sau)
+		like.MouseButton1Click:Connect(function()
+			like.Text = "✅"
+			dislike.Visible = false
 		end)
-		dislikeBtn.MouseButton1Click:Connect(function()
-			dislikeBtn.Text = "✅"
-			likeBtn.Visible = false
-			CallAI("Người chơi không thích câu trả lời trước. Hãy trả lời tốt hơn lần sau và ngắn gọn hơn.", true)
+		dislike.MouseButton1Click:Connect(function()
+			dislike.Text = "✅"
+			like.Visible = false
+			CallAI(Personalization.Language == "English"
+				and "The player didn't like the previous reply. Please reply better and more concisely."
+				or "Người chơi không thích câu trả lời trước. Hãy trả lời tốt hơn và ngắn gọn hơn.")
 		end)
 	end
 
@@ -598,12 +749,15 @@ local function AddChatMessage(role, text, showFeedback)
 end
 
 local function CreateSettingsUI()
-	if SettingsFrame then SettingsFrame.Visible = not SettingsFrame.Visible return end
+	if SettingsFrame then
+		SettingsFrame.Visible = not SettingsFrame.Visible
+		return
+	end
 
 	SettingsFrame = Create("Frame", {
 		Name = "Settings",
-		Size = UDim2.new(0, 320, 0, 380),
-		Position = UDim2.new(0.5, -160, 0.5, -190),
+		Size = UDim2.new(0, 320, 0, 480),
+		Position = UDim2.new(0.5, -160, 0.5, -240),
 		BackgroundColor3 = Color3.fromRGB(22, 24, 32),
 		BorderSizePixel = 0,
 		Parent = ScreenGui
@@ -621,12 +775,12 @@ local function CreateSettingsUI()
 		Parent = SettingsFrame
 	})
 
-	-- Tên AI
+	-- Tên
 	Create("TextLabel", {
 		Size = UDim2.new(1, -20, 0, 20),
 		Position = UDim2.new(0, 10, 0, 50),
 		BackgroundTransparency = 1,
-		Text = "Tên AI:",
+		Text = "Tên AI / Name:",
 		TextColor3 = Color3.fromRGB(180, 190, 210),
 		Font = Enum.Font.Gotham,
 		TextSize = 14,
@@ -650,9 +804,9 @@ local function CreateSettingsUI()
 	-- Tính cách
 	Create("TextLabel", {
 		Size = UDim2.new(1, -20, 0, 20),
-		Position = UDim2.new(0, 10, 0, 120),
+		Position = UDim2.new(0, 10, 0, 118),
 		BackgroundTransparency = 1,
-		Text = "Tính cách:",
+		Text = "Tính cách / Personality:",
 		TextColor3 = Color3.fromRGB(180, 190, 210),
 		Font = Enum.Font.Gotham,
 		TextSize = 14,
@@ -661,11 +815,11 @@ local function CreateSettingsUI()
 	})
 
 	local personalities = {"Vui vẻ", "Nghiêm túc", "Hài hước", "Hỗ trợ", "Trung lập"}
-	local yPos = 145
+	local y = 142
 	for _, p in ipairs(personalities) do
 		local btn = Create("TextButton", {
-			Size = UDim2.new(1, -20, 0, 32),
-			Position = UDim2.new(0, 10, 0, yPos),
+			Size = UDim2.new(1, -20, 0, 30),
+			Position = UDim2.new(0, 10, 0, y),
 			BackgroundColor3 = Personalization.Personality == p and Color3.fromRGB(50, 100, 180) or Color3.fromRGB(35, 40, 55),
 			Text = p,
 			TextColor3 = Color3.fromRGB(230, 235, 255),
@@ -683,15 +837,54 @@ local function CreateSettingsUI()
 			end
 			btn.BackgroundColor3 = Color3.fromRGB(50, 100, 180)
 		end)
-		yPos = yPos + 38
+		y = y + 34
 	end
 
-	-- Nút lưu
+	-- Ngôn ngữ
+	Create("TextLabel", {
+		Size = UDim2.new(1, -20, 0, 20),
+		Position = UDim2.new(0, 10, 0, y + 8),
+		BackgroundTransparency = 1,
+		Text = "Ngôn ngữ / Language:",
+		TextColor3 = Color3.fromRGB(180, 190, 210),
+		Font = Enum.Font.Gotham,
+		TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = SettingsFrame
+	})
+
+	y = y + 32
+
+	local languages = {"Tiếng Việt", "English"}
+	for i, lang in ipairs(languages) do
+		local btn = Create("TextButton", {
+			Size = UDim2.new(0.45, -6, 0, 32),
+			Position = UDim2.new(i == 1 and 0 or 0.5, 10, 0, y),
+			BackgroundColor3 = Personalization.Language == lang and Color3.fromRGB(50, 100, 180) or Color3.fromRGB(35, 40, 55),
+			Text = lang,
+			TextColor3 = Color3.fromRGB(230, 235, 255),
+			Font = Enum.Font.Gotham,
+			TextSize = 14,
+			Parent = SettingsFrame
+		})
+		Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = btn})
+		btn.MouseButton1Click:Connect(function()
+			Personalization.Language = lang
+			for _, child in ipairs(SettingsFrame:GetChildren()) do
+				if child:IsA("TextButton") and (child.Text == "Tiếng Việt" or child.Text == "English") then
+					child.BackgroundColor3 = Color3.fromRGB(35, 40, 55)
+				end
+			end
+			btn.BackgroundColor3 = Color3.fromRGB(50, 100, 180)
+		end)
+	end
+
+	-- Lưu
 	local saveBtn = Create("TextButton", {
 		Size = UDim2.new(1, -20, 0, 40),
 		Position = UDim2.new(0, 10, 1, -55),
 		BackgroundColor3 = Color3.fromRGB(40, 140, 80),
-		Text = "Lưu & Áp dụng",
+		Text = "Lưu & Áp dụng / Save",
 		TextColor3 = Color3.fromRGB(255, 255, 255),
 		Font = Enum.Font.GothamBold,
 		TextSize = 16,
@@ -701,12 +894,13 @@ local function CreateSettingsUI()
 
 	saveBtn.MouseButton1Click:Connect(function()
 		Personalization.Name = nameBox.Text \~= "" and nameBox.Text or Personalization.Name
-		CONFIG.AI_NAME = Personalization.Name
 		SavePersonalization()
 
 		if AICharacter then
 			AICharacter.Name = Personalization.Name
-			if AIHumanoid then AIHumanoid.DisplayName = Personalization.Name end
+			if AIHumanoid then
+				AIHumanoid.DisplayName = Personalization.Name
+			end
 			local tag = AIRoot and AIRoot:FindFirstChild("AINameTag")
 			if tag and tag:FindFirstChildOfClass("TextLabel") then
 				tag:FindFirstChildOfClass("TextLabel").Text = Personalization.Name
@@ -714,11 +908,16 @@ local function CreateSettingsUI()
 		end
 
 		SettingsFrame.Visible = false
-		AddChatMessage("AI", "Đã cập nhật! Tôi giờ là " .. Personalization.Name .. " với tính cách " .. Personalization.Personality)
-		ShowBubble("Đã cá nhân hoá xong!", 3)
+		StatusLabel.Text = "Sẵn sàng • " .. Personalization.Personality .. " • " .. Personalization.Language
+
+		local msg = Personalization.Language == "English"
+			and ("Updated! I am now " .. Personalization.Name .. " • " .. Personalization.Personality)
+			or ("Đã cập nhật! Tôi giờ là " .. Personalization.Name .. " • " .. Personalization.Personality)
+
+		AddChatMessage("AI", msg)
+		ShowBubble(Personalization.Language == "English" and "Personalization saved!" or "Đã cá nhân hoá xong!", 3)
 	end)
 
-	-- Nút đóng
 	local closeBtn = Create("TextButton", {
 		Size = UDim2.new(0, 36, 0, 36),
 		Position = UDim2.new(1, -42, 0, 4),
@@ -742,7 +941,6 @@ local function CreateUI()
 		Parent = PlayerGui
 	})
 
-	-- Toggle
 	ToggleBtn = Create("TextButton", {
 		Name = "Toggle",
 		Size = UDim2.new(0, 56, 0, 56),
@@ -755,7 +953,6 @@ local function CreateUI()
 	})
 	Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = ToggleBtn})
 
-	-- Main Frame
 	MainFrame = Create("Frame", {
 		Name = "Main",
 		Size = UDim2.new(0, 340, 0, 460),
@@ -768,7 +965,6 @@ local function CreateUI()
 	Create("UICorner", {CornerRadius = UDim.new(0, 14), Parent = MainFrame})
 	Create("UIStroke", {Color = Color3.fromRGB(60, 120, 220), Thickness = 1.5, Parent = MainFrame})
 
-	-- Header
 	local header = Create("Frame", {
 		Size = UDim2.new(1, 0, 0, 44),
 		BackgroundColor3 = Color3.fromRGB(35, 50, 90),
@@ -814,7 +1010,7 @@ local function CreateUI()
 		Size = UDim2.new(1, -16, 0, 22),
 		Position = UDim2.new(0, 8, 0, 48),
 		BackgroundTransparency = 1,
-		Text = "Sẵn sàng • " .. Personalization.Personality,
+		Text = "Sẵn sàng • " .. Personalization.Personality .. " • " .. Personalization.Language,
 		TextColor3 = Color3.fromRGB(140, 200, 140),
 		Font = Enum.Font.Gotham,
 		TextSize = 13,
@@ -833,10 +1029,16 @@ local function CreateUI()
 		Parent = MainFrame
 	})
 	Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = ChatScroll})
-	Create("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6), Parent = ChatScroll})
+	Create("UIListLayout", {
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 6),
+		Parent = ChatScroll
+	})
 	Create("UIPadding", {
-		PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6),
-		PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6),
+		PaddingTop = UDim.new(0, 6),
+		PaddingBottom = UDim.new(0, 6),
+		PaddingLeft = UDim.new(0, 6),
+		PaddingRight = UDim.new(0, 6),
 		Parent = ChatScroll
 	})
 
@@ -853,7 +1055,7 @@ local function CreateUI()
 		Size = UDim2.new(1, -70, 1, -8),
 		Position = UDim2.new(0, 10, 0, 4),
 		BackgroundTransparency = 1,
-		PlaceholderText = "Nhập tin nhắn...",
+		PlaceholderText = "Nhập tin nhắn... / Type a message...",
 		PlaceholderColor3 = Color3.fromRGB(120, 130, 150),
 		Text = "",
 		TextColor3 = Color3.fromRGB(230, 235, 255),
@@ -876,33 +1078,42 @@ local function CreateUI()
 	})
 	Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = SendBtn})
 
-	-- Events
 	ToggleBtn.MouseButton1Click:Connect(function()
 		MainFrame.Visible = not MainFrame.Visible
 	end)
-	closeBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false end)
+	closeBtn.MouseButton1Click:Connect(function()
+		MainFrame.Visible = false
+	end)
 
 	local function SendMessage()
 		local text = InputBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
-		if text == "" or IsThinking then return end
+		if text == "" or IsThinking then
+			return
+		end
 		InputBox.Text = ""
 		AddChatMessage("You", text)
-		StatusLabel.Text = "Đang suy nghĩ..."
+		StatusLabel.Text = Personalization.Language == "English" and "Thinking..." or "Đang suy nghĩ..."
 		StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+
 		task.spawn(function()
 			CallAI(text)
-			StatusLabel.Text = "Sẵn sàng • " .. Personalization.Personality
+			StatusLabel.Text = "Sẵn sàng • " .. Personalization.Personality .. " • " .. Personalization.Language
 			StatusLabel.TextColor3 = Color3.fromRGB(140, 200, 140)
 		end)
 	end
 
 	SendBtn.MouseButton1Click:Connect(SendMessage)
-	InputBox.FocusLost:Connect(function(enter) if enter then SendMessage() end end)
+	InputBox.FocusLost:Connect(function(enter)
+		if enter then
+			SendMessage()
+		end
+	end)
 
-	-- Responsive
 	local function UpdateLayout()
 		local cam = workspace.CurrentCamera
-		if not cam then return end
+		if not cam then
+			return
+		end
 		if cam.ViewportSize.X < 700 then
 			MainFrame.Size = UDim2.new(0.92, 0, 0.68, 0)
 			MainFrame.Position = UDim2.new(0.04, 0, 0.18, 0)
@@ -924,20 +1135,26 @@ local function StartSystems()
 	CreateUI()
 
 	task.wait(1)
-	AddChatMessage("AI", "Xin chào! Tôi là " .. Personalization.Name .. ". Bấm ⚙️ để cá nhân hoá tôi nhé!")
-	ShowBubble("Xin chào! Tôi sẵn sàng.", 4)
+	local welcome = Personalization.Language == "English"
+		and ("Hello! I am " .. Personalization.Name .. ". Press ⚙️ to personalize me!")
+		or ("Xin chào! Tôi là " .. Personalization.Name .. ". Bấm ⚙️ để cá nhân hoá!")
 
-	local lastPathUpdate, lastStuckCheck = 0, 0
+	AddChatMessage("AI", welcome)
+	ShowBubble(Personalization.Language == "English" and "Hello! I'm ready." or "Xin chào! Tôi sẵn sàng.", 4)
+
+	local lastPath, lastStuck = 0, 0
 	table.insert(Connections, RunService.Heartbeat:Connect(function()
-		if not AICharacter or not AICharacter.Parent then return end
+		if not AICharacter or not AICharacter.Parent then
+			return
+		end
 		UpdateAnimation()
 		local now = tick()
-		if IsFollowing and now - lastPathUpdate > CONFIG.PATH_UPDATE_INTERVAL then
-			lastPathUpdate = now
+		if IsFollowing and now - lastPath > CONFIG.PATH_UPDATE_INTERVAL then
+			lastPath = now
 			FollowPlayer()
 		end
-		if now - lastStuckCheck > CONFIG.STUCK_CHECK_INTERVAL then
-			lastStuckCheck = now
+		if now - lastStuck > CONFIG.STUCK_CHECK_INTERVAL then
+			lastStuck = now
 			CheckStuck()
 		end
 	end))
@@ -961,7 +1178,9 @@ local function StartSystems()
 end
 
 task.spawn(function()
-	if not LocalPlayer.Character then LocalPlayer.CharacterAdded:Wait() end
+	if not LocalPlayer.Character then
+		LocalPlayer.CharacterAdded:Wait()
+	end
 	Character = LocalPlayer.Character
 	Humanoid = Character:WaitForChild("Humanoid")
 	RootPart = Character:WaitForChild("HumanoidRootPart")
@@ -969,4 +1188,4 @@ task.spawn(function()
 	StartSystems()
 end)
 
-print("[AI Companion] Loaded with Personalization + Feedback")
+print("[AI Companion] Final version loaded")
