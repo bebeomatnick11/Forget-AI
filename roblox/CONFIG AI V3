@@ -16,7 +16,7 @@ local RootPart = Character:WaitForChild("HumanoidRootPart")
 -- CONFIG
 --==========================================================
 local CONFIG = {
-	BACKEND_URL = "https://forget-ai.onrender.com/api/chat", -- my backend url (You can replace it with your backend URL if you want) :v
+	BACKEND_URL = "https://forget-ai.onrender.com/api/chat",
 
 	FOLLOW_DISTANCE = 6,
 	TELEPORT_DISTANCE = 60,
@@ -33,7 +33,8 @@ local CONFIG = {
 local Personalization = {
 	Name = LocalPlayer.Name .. "'s AI",
 	Personality = "Trung lập",
-	Language = "Tiếng Việt", -- "Tiếng Việt" | "English"
+	Language = "Tiếng Việt",
+	AutoFollow = false,
 }
 
 local PersonalityPrompts = {
@@ -83,9 +84,7 @@ local Connections = {}
 --==========================================================
 local function SafeDestroy(obj)
 	if obj and obj.Parent then
-		pcall(function()
-			obj:Destroy()
-		end)
+		pcall(function() obj:Destroy() end)
 	end
 end
 
@@ -132,9 +131,7 @@ local function LoadAnimations(animator)
 end
 
 local function PlayAnim(name, fade)
-	if not AnimationTracks[name] or CurrentAnimState == name then
-		return
-	end
+	if not AnimationTracks[name] or CurrentAnimState == name then return end
 	if AnimationTracks[CurrentAnimState] and AnimationTracks[CurrentAnimState].IsPlaying then
 		AnimationTracks[CurrentAnimState]:Stop(fade or 0.2)
 	end
@@ -143,9 +140,7 @@ local function PlayAnim(name, fade)
 end
 
 local function UpdateAnimation()
-	if not AIHumanoid or not AIRoot then
-		return
-	end
+	if not AIHumanoid or not AIRoot then return end
 	local state = AIHumanoid:GetState()
 	local speed = AIRoot.AssemblyLinearVelocity.Magnitude
 
@@ -170,21 +165,15 @@ end
 -- CREATE AI CHARACTER
 --==========================================================
 local function CreateAICharacter()
-	if AICharacter then
-		SafeDestroy(AICharacter)
-	end
+	if AICharacter then SafeDestroy(AICharacter) end
 
 	local source = LocalPlayer.Character
-	if not source then
-		return
-	end
+	if not source then return end
 
 	local ok, cloned = pcall(function()
 		return source:Clone()
 	end)
-	if not ok or not cloned then
-		return
-	end
+	if not ok or not cloned then return end
 
 	cloned.Name = Personalization.Name
 	cloned.Parent = workspace
@@ -209,9 +198,7 @@ local function CreateAICharacter()
 	hum.JumpPower = 50
 
 	local oldAnimate = cloned:FindFirstChild("Animate")
-	if oldAnimate then
-		oldAnimate:Destroy()
-	end
+	if oldAnimate then oldAnimate:Destroy() end
 
 	local anim = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
 
@@ -245,6 +232,10 @@ local function CreateAICharacter()
 		TextScaled = true,
 		Parent = billboard
 	})
+
+	if Personalization.AutoFollow then
+		IsFollowing = true
+	end
 end
 
 --==========================================================
@@ -252,17 +243,11 @@ end
 --==========================================================
 local function ShowBubble(text, duration)
 	duration = duration or 4
-	if tick() - LastBubbleTime < CONFIG.BUBBLE_COOLDOWN then
-		return
-	end
+	if tick() - LastBubbleTime < CONFIG.BUBBLE_COOLDOWN then return end
 	LastBubbleTime = tick()
 
-	if CurrentBubble then
-		SafeDestroy(CurrentBubble)
-	end
-	if not AIRoot then
-		return
-	end
+	if CurrentBubble then SafeDestroy(CurrentBubble) end
+	if not AIRoot then return end
 
 	local billboard = Create("BillboardGui", {
 		Name = "AIBubble",
@@ -314,9 +299,7 @@ end
 -- PATHFINDING + FOLLOW
 --==========================================================
 local function ComputePath(targetPos)
-	if not AIRoot then
-		return nil
-	end
+	if not AIRoot then return nil end
 	local path = PathfindingService:CreatePath({
 		AgentRadius = 2,
 		AgentHeight = 5,
@@ -334,9 +317,7 @@ local function ComputePath(targetPos)
 end
 
 local function FollowPlayer()
-	if not IsFollowing or not AIRoot or not RootPart then
-		return
-	end
+	if not IsFollowing or not AIRoot or not RootPart then return end
 	local dist = (AIRoot.Position - RootPart.Position).Magnitude
 
 	if dist >= CONFIG.TELEPORT_DISTANCE then
@@ -372,9 +353,7 @@ local function FollowPlayer()
 end
 
 local function CheckStuck()
-	if not AIRoot or not IsFollowing then
-		return
-	end
+	if not AIRoot or not IsFollowing then return end
 	if not LastPosition then
 		LastPosition = AIRoot.Position
 		return
@@ -411,9 +390,7 @@ local ValidActions = {
 
 local function ExecuteAction(actionName)
 	local action = tostring(actionName or ""):upper()
-	if not ValidActions[action] then
-		return
-	end
+	if not ValidActions[action] then return end
 	CurrentAction = action
 
 	if action == "FOLLOW_PLAYER" then
@@ -440,6 +417,7 @@ local function ExecuteAction(actionName)
 	elseif action == "TELEPORT_NEAR" then
 		if RootPart and AIRoot then
 			AIRoot.CFrame = CFrame.new(RootPart.Position + RootPart.CFrame.RightVector * 3)
+			ShowBubble(Personalization.Language == "English" and "I'm here!" or "Tôi đây!", 2)
 		end
 	elseif action == "IDLE" then
 		IsFollowing = false
@@ -448,7 +426,7 @@ local function ExecuteAction(actionName)
 end
 
 --==========================================================
--- AI BRAIN (FINAL SYNCED VERSION)
+-- AI BRAIN
 --==========================================================
 local function BuildContext()
 	return {
@@ -473,15 +451,11 @@ local function BuildContext()
 end
 
 local function CallAI(userMessage)
-	if IsThinking then
-		return
-	end
+	if IsThinking then return end
 	IsThinking = true
-
 	ShowThinkingBubble()
 
 	local context = BuildContext()
-
 	local languageInstruction = LanguagePrompts[Personalization.Language] or LanguagePrompts["Tiếng Việt"]
 	local personalityText = PersonalityPrompts[Personalization.Personality] or PersonalityPrompts["Trung lập"]
 
@@ -506,7 +480,6 @@ Không giải thích bên ngoài JSON.
 }
 
 Các action hợp lệ:
-
 FOLLOW_PLAYER
 STOP
 JUMP
@@ -516,7 +489,6 @@ SAY
 IDLE
 
 Quy tắc action:
-
 - Người chơi bảo đi theo → FOLLOW_PLAYER
 - Người chơi bảo dừng → STOP
 - Người chơi bảo nhảy → JUMP
@@ -558,15 +530,12 @@ Người chơi nói:
 
 	if response.StatusCode ~= 200 then
 		local serverError = "Backend HTTP " .. tostring(response.StatusCode)
-
 		local errorOk, errorData = pcall(function()
 			return HttpService:JSONDecode(response.Body)
 		end)
-
 		if errorOk and type(errorData) == "table" then
 			serverError = tostring(errorData.error or serverError)
 		end
-
 		ShowBubble("❌ " .. serverError, 5)
 		AddChatMessage("AI", serverError)
 		return
@@ -590,16 +559,12 @@ Người chơi nói:
 	end
 
 	local rawReply = tostring(decoded.reply or "")
-
 	if rawReply == "" then
 		ShowBubble("AI không trả lời.", 3)
 		AddChatMessage("AI", "Không nhận được câu trả lời.")
 		return
 	end
 
-	--======================================================
-	-- PARSE AI JSON
-	--======================================================
 	local actionData = {
 		reply = rawReply,
 		action = "SAY",
@@ -633,9 +598,6 @@ Người chơi nói:
 		end
 	end
 
-	--======================================================
-	-- VALIDATE ACTION
-	--======================================================
 	if not ValidActions[actionData.action] then
 		actionData.action = "SAY"
 	end
@@ -643,9 +605,6 @@ Người chơi nói:
 	local reply = actionData.reply
 	local action = actionData.action
 
-	--======================================================
-	-- MEMORY
-	--======================================================
 	if #Memory >= 8 then
 		table.remove(Memory, 1)
 	end
@@ -654,32 +613,23 @@ Người chơi nói:
 		ai = reply,
 	})
 
-	--======================================================
-	-- DISPLAY
-	--======================================================
 	AddChatMessage("AI", reply, true)
 	ShowBubble(reply, 5)
-
-	--======================================================
-	-- ACTION
-	--======================================================
 	ExecuteAction(action)
 end
 
 --==========================================================
--- UI + PERSONALIZATION + LANGUAGE
+-- UI
 --==========================================================
 local ScreenGui, MainFrame, ChatScroll, InputBox, SendBtn, ToggleBtn, StatusLabel
-local SettingsFrame
+local SettingsFrame, QuickFrame
 
 local function AddChatMessage(role, text, showFeedback)
 	table.insert(ChatHistory, {role = role, text = text})
 	if #ChatHistory > CONFIG.MAX_HISTORY then
 		table.remove(ChatHistory, 1)
 	end
-	if not ChatScroll then
-		return
-	end
+	if not ChatScroll then return end
 
 	local msgFrame = Create("Frame", {
 		Size = UDim2.new(1, -8, 0, 0),
@@ -748,6 +698,41 @@ local function AddChatMessage(role, text, showFeedback)
 	end
 end
 
+local function CreateQuickActions()
+	QuickFrame = Create("Frame", {
+		Name = "QuickActions",
+		Size = UDim2.new(1, -16, 0, 36),
+		Position = UDim2.new(0, 8, 1, -100),
+		BackgroundTransparency = 1,
+		Parent = MainFrame
+	})
+
+	local actions = {
+		{text = "Đi theo", action = "FOLLOW_PLAYER", color = Color3.fromRGB(40, 120, 80)},
+		{text = "Dừng", action = "STOP", color = Color3.fromRGB(140, 60, 60)},
+		{text = "Nhảy", action = "JUMP", color = Color3.fromRGB(60, 90, 160)},
+		{text = "Lại đây", action = "TELEPORT_NEAR", color = Color3.fromRGB(100, 70, 160)},
+	}
+
+	for i, info in ipairs(actions) do
+		local btn = Create("TextButton", {
+			Size = UDim2.new(0.23, -4, 1, 0),
+			Position = UDim2.new((i - 1) * 0.25, 2, 0, 0),
+			BackgroundColor3 = info.color,
+			Text = info.text,
+			TextColor3 = Color3.fromRGB(255, 255, 255),
+			Font = Enum.Font.GothamBold,
+			TextSize = 13,
+			Parent = QuickFrame
+		})
+		Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = btn})
+
+		btn.MouseButton1Click:Connect(function()
+			ExecuteAction(info.action)
+		end)
+	end
+end
+
 local function CreateSettingsUI()
 	if SettingsFrame then
 		SettingsFrame.Visible = not SettingsFrame.Visible
@@ -756,8 +741,8 @@ local function CreateSettingsUI()
 
 	SettingsFrame = Create("Frame", {
 		Name = "Settings",
-		Size = UDim2.new(0, 320, 0, 480),
-		Position = UDim2.new(0.5, -160, 0.5, -240),
+		Size = UDim2.new(0, 320, 0, 500),
+		Position = UDim2.new(0.5, -160, 0.5, -250),
 		BackgroundColor3 = Color3.fromRGB(22, 24, 32),
 		BorderSizePixel = 0,
 		Parent = ScreenGui
@@ -775,7 +760,6 @@ local function CreateSettingsUI()
 		Parent = SettingsFrame
 	})
 
-	-- Tên
 	Create("TextLabel", {
 		Size = UDim2.new(1, -20, 0, 20),
 		Position = UDim2.new(0, 10, 0, 50),
@@ -801,7 +785,6 @@ local function CreateSettingsUI()
 	})
 	Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = nameBox})
 
-	-- Tính cách
 	Create("TextLabel", {
 		Size = UDim2.new(1, -20, 0, 20),
 		Position = UDim2.new(0, 10, 0, 118),
@@ -840,7 +823,6 @@ local function CreateSettingsUI()
 		y = y + 34
 	end
 
-	-- Ngôn ngữ
 	Create("TextLabel", {
 		Size = UDim2.new(1, -20, 0, 20),
 		Position = UDim2.new(0, 10, 0, y + 8),
@@ -879,7 +861,26 @@ local function CreateSettingsUI()
 		end)
 	end
 
-	-- Lưu
+	y = y + 50
+
+	-- Auto Follow toggle
+	local autoBtn = Create("TextButton", {
+		Size = UDim2.new(1, -20, 0, 36),
+		Position = UDim2.new(0, 10, 0, y),
+		BackgroundColor3 = Personalization.AutoFollow and Color3.fromRGB(40, 130, 80) or Color3.fromRGB(60, 60, 70),
+		Text = Personalization.AutoFollow and "✅ Tự động đi theo khi vào game" or "⬜ Tự động đi theo khi vào game",
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		Font = Enum.Font.Gotham,
+		TextSize = 14,
+		Parent = SettingsFrame
+	})
+	Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = autoBtn})
+	autoBtn.MouseButton1Click:Connect(function()
+		Personalization.AutoFollow = not Personalization.AutoFollow
+		autoBtn.BackgroundColor3 = Personalization.AutoFollow and Color3.fromRGB(40, 130, 80) or Color3.fromRGB(60, 60, 70)
+		autoBtn.Text = Personalization.AutoFollow and "✅ Tự động đi theo khi vào game" or "⬜ Tự động đi theo khi vào game"
+	end)
+
 	local saveBtn = Create("TextButton", {
 		Size = UDim2.new(1, -20, 0, 40),
 		Position = UDim2.new(0, 10, 1, -55),
@@ -911,11 +912,11 @@ local function CreateSettingsUI()
 		StatusLabel.Text = "Sẵn sàng • " .. Personalization.Personality .. " • " .. Personalization.Language
 
 		local msg = Personalization.Language == "English"
-			and ("Updated! I am now " .. Personalization.Name .. " • " .. Personalization.Personality)
-			or ("Đã cập nhật! Tôi giờ là " .. Personalization.Name .. " • " .. Personalization.Personality)
+			and ("Updated! I am now " .. Personalization.Name)
+			or ("Đã cập nhật! Tôi giờ là " .. Personalization.Name)
 
 		AddChatMessage("AI", msg)
-		ShowBubble(Personalization.Language == "English" and "Personalization saved!" or "Đã cá nhân hoá xong!", 3)
+		ShowBubble(Personalization.Language == "English" and "Saved!" or "Đã lưu!", 3)
 	end)
 
 	local closeBtn = Create("TextButton", {
@@ -941,10 +942,12 @@ local function CreateUI()
 		Parent = PlayerGui
 	})
 
+	-- Toggle
 	ToggleBtn = Create("TextButton", {
 		Name = "Toggle",
 		Size = UDim2.new(0, 56, 0, 56),
-		Position = UDim2.new(1, -70, 1, -160),
+		Position = UDim2.new(1, -20, 1, -20),
+		AnchorPoint = Vector2.new(1, 1),
 		BackgroundColor3 = Color3.fromRGB(40, 100, 200),
 		Text = "🤖",
 		TextSize = 28,
@@ -953,10 +956,12 @@ local function CreateUI()
 	})
 	Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = ToggleBtn})
 
+	-- Main Frame
 	MainFrame = Create("Frame", {
 		Name = "Main",
-		Size = UDim2.new(0, 340, 0, 460),
-		Position = UDim2.new(1, -360, 1, -490),
+		Size = UDim2.new(0, 340, 0, 500),
+		Position = UDim2.new(1, -20, 1, -20),
+		AnchorPoint = Vector2.new(1, 1),
 		BackgroundColor3 = Color3.fromRGB(22, 24, 32),
 		BorderSizePixel = 0,
 		Visible = false,
@@ -965,6 +970,7 @@ local function CreateUI()
 	Create("UICorner", {CornerRadius = UDim.new(0, 14), Parent = MainFrame})
 	Create("UIStroke", {Color = Color3.fromRGB(60, 120, 220), Thickness = 1.5, Parent = MainFrame})
 
+	-- Header
 	local header = Create("Frame", {
 		Size = UDim2.new(1, 0, 0, 44),
 		BackgroundColor3 = Color3.fromRGB(35, 50, 90),
@@ -1018,8 +1024,9 @@ local function CreateUI()
 		Parent = MainFrame
 	})
 
+	-- Chat
 	ChatScroll = Create("ScrollingFrame", {
-		Size = UDim2.new(1, -16, 1, -150),
+		Size = UDim2.new(1, -16, 1, -190),
 		Position = UDim2.new(0, 8, 0, 74),
 		BackgroundColor3 = Color3.fromRGB(18, 20, 28),
 		BorderSizePixel = 0,
@@ -1042,6 +1049,9 @@ local function CreateUI()
 		Parent = ChatScroll
 	})
 
+	CreateQuickActions()
+
+	-- Input
 	local inputFrame = Create("Frame", {
 		Size = UDim2.new(1, -16, 0, 44),
 		Position = UDim2.new(0, 8, 1, -54),
@@ -1078,6 +1088,7 @@ local function CreateUI()
 	})
 	Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = SendBtn})
 
+	-- Events
 	ToggleBtn.MouseButton1Click:Connect(function()
 		MainFrame.Visible = not MainFrame.Visible
 	end)
@@ -1087,9 +1098,7 @@ local function CreateUI()
 
 	local function SendMessage()
 		local text = InputBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
-		if text == "" or IsThinking then
-			return
-		end
+		if text == "" or IsThinking then return end
 		InputBox.Text = ""
 		AddChatMessage("You", text)
 		StatusLabel.Text = Personalization.Language == "English" and "Thinking..." or "Đang suy nghĩ..."
@@ -1104,25 +1113,34 @@ local function CreateUI()
 
 	SendBtn.MouseButton1Click:Connect(SendMessage)
 	InputBox.FocusLost:Connect(function(enter)
-		if enter then
-			SendMessage()
-		end
+		if enter then SendMessage() end
 	end)
 
+	-- Responsive Mobile
 	local function UpdateLayout()
 		local cam = workspace.CurrentCamera
-		if not cam then
-			return
-		end
-		if cam.ViewportSize.X < 700 then
-			MainFrame.Size = UDim2.new(0.92, 0, 0.68, 0)
-			MainFrame.Position = UDim2.new(0.04, 0, 0.18, 0)
-			ToggleBtn.Position = UDim2.new(1, -70, 1, -140)
+		if not cam then return end
+
+		local size = cam.ViewportSize
+		local isMobile = size.X < 700 or size.Y < 500
+
+		if isMobile then
+			MainFrame.Size = UDim2.new(0.94, 0, 0.75, 0)
+			MainFrame.Position = UDim2.new(0.5, 0, 0.98, 0)
+			MainFrame.AnchorPoint = Vector2.new(0.5, 1)
+
+			ToggleBtn.Size = UDim2.new(0, 52, 0, 52)
+			ToggleBtn.Position = UDim2.new(1, -16, 1, -16)
 		else
-			MainFrame.Size = UDim2.new(0, 340, 0, 460)
-			MainFrame.Position = UDim2.new(1, -360, 1, -490)
+			MainFrame.Size = UDim2.new(0, 340, 0, 500)
+			MainFrame.Position = UDim2.new(1, -20, 1, -20)
+			MainFrame.AnchorPoint = Vector2.new(1, 1)
+
+			ToggleBtn.Size = UDim2.new(0, 56, 0, 56)
+			ToggleBtn.Position = UDim2.new(1, -20, 1, -20)
 		end
 	end
+
 	UpdateLayout()
 	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateLayout)
 end
@@ -1134,7 +1152,7 @@ local function StartSystems()
 	CreateAICharacter()
 	CreateUI()
 
-	task.wait(1)
+	task.wait(1.2)
 	local welcome = Personalization.Language == "English"
 		and ("Hello! I am " .. Personalization.Name .. ". Press ⚙️ to personalize me!")
 		or ("Xin chào! Tôi là " .. Personalization.Name .. ". Bấm ⚙️ để cá nhân hoá!")
@@ -1144,9 +1162,7 @@ local function StartSystems()
 
 	local lastPath, lastStuck = 0, 0
 	table.insert(Connections, RunService.Heartbeat:Connect(function()
-		if not AICharacter or not AICharacter.Parent then
-			return
-		end
+		if not AICharacter or not AICharacter.Parent then return end
 		UpdateAnimation()
 		local now = tick()
 		if IsFollowing and now - lastPath > CONFIG.PATH_UPDATE_INTERVAL then
@@ -1188,4 +1204,4 @@ task.spawn(function()
 	StartSystems()
 end)
 
-print("[AI Companion] Final version loaded")
+print("[AI] Final Version Is Work")
