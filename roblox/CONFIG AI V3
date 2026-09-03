@@ -556,7 +556,7 @@ Người chơi nói:
 		return
 	end
 
-	if response.StatusCode \~= 200 then
+	if response.StatusCode ~= 200 then
 		local serverError = "Backend HTTP " .. tostring(response.StatusCode)
 
 		local errorOk, errorData = pcall(function()
@@ -576,13 +576,13 @@ Người chơi nói:
 		return HttpService:JSONDecode(response.Body)
 	end)
 
-	if not decodeOk or type(decoded) \~= "table" then
+	if not decodeOk or type(decoded) ~= "table" then
 		ShowBubble("❌ Backend trả dữ liệu không hợp lệ.", 4)
 		AddChatMessage("AI", "Phản hồi backend không hợp lệ.")
 		return
 	end
 
-	if decoded.ok \~= true then
+	if decoded.ok ~= true then
 		local err = tostring(decoded.error or "AI gặp lỗi.")
 		ShowBubble("❌ " .. err, 4)
 		AddChatMessage("AI", err)
@@ -610,10 +610,10 @@ Người chơi nói:
 	end)
 
 	if parseOk and type(parsed) == "table" then
-		if parsed.reply \~= nil then
+		if parsed.reply ~= nil then
 			actionData.reply = tostring(parsed.reply)
 		end
-		if parsed.action \~= nil then
+		if parsed.action ~= nil then
 			actionData.action = tostring(parsed.action):upper()
 		end
 	else
@@ -623,10 +623,10 @@ Người chơi nói:
 				return HttpService:JSONDecode(jsonStr)
 			end)
 			if retryOk and type(retryParsed) == "table" then
-				if retryParsed.reply \~= nil then
+				if retryParsed.reply ~= nil then
 					actionData.reply = tostring(retryParsed.reply)
 				end
-				if retryParsed.action \~= nil then
+				if retryParsed.action ~= nil then
 					actionData.action = tostring(retryParsed.action):upper()
 				end
 			end
@@ -893,7 +893,7 @@ local function CreateSettingsUI()
 	Create("UICorner", {CornerRadius = UDim.new(0, 10), Parent = saveBtn})
 
 	saveBtn.MouseButton1Click:Connect(function()
-		Personalization.Name = nameBox.Text \~= "" and nameBox.Text or Personalization.Name
+		Personalization.Name = nameBox.Text ~= "" and nameBox.Text or Personalization.Name
 		SavePersonalization()
 
 		if AICharacter then
