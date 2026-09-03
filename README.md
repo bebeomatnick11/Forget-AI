@@ -1,217 +1,541 @@
-⚠️ Important Security & Billing Notice
+🤖 Forget-AI — REAL AI IN ROBLOX!!!
 
-This project uses a server-side AI API. The Roblox client must never contain an OpenAI API key.
+«A Roblox AI Companion powered by a secure backend proxy and OpenAI.»
 
-Required architecture:
+Forget-AI is an AI Companion project for Roblox.
 
-Roblox LocalScript
-        │
-        │ HTTPS
-        ▼
-Secure Backend Proxy
-        │
-        │ OPENAI_API_KEY (Environment Variable / Secret)
-        ▼
-OpenAI API
+The companion can clone the player's avatar, move around the game, follow the player, use animations, respond through chat and bubble chat, remember recent conversation context, and execute a small set of safe in-game actions.
 
-🔐 API Key Security
+The project is designed around a simple rule:
 
-- "OPENAI_API_KEY" must exist only on the backend/server.
-- Never hard-code the key into Lua, JavaScript, JSON, configuration files, or frontend code.
-- Never put the key in the Roblox LocalScript.
-- Never use Base64, string splitting, obfuscation, or client-side encryption as a substitute for proper secret storage.
-- Never commit ".env" or any file containing the real API key to GitHub.
-- ".env.example" must contain only an empty placeholder.
-- If an API key has ever been exposed publicly, revoke it and create a new one.
+The Roblox client never receives the OpenAI API key.
 
-💳 API Usage & Cost
+---
 
-The OpenAI API is a paid API service and API requests may incur charges according to the OpenAI account, billing configuration, model, and usage.
+✨ Features
 
-Using ChatGPT/GPT through an OpenAI consumer product is not the same thing as having free API credits.
+🤖 AI Companion
 
-Before deploying this project publicly, make sure you understand the API pricing and configure appropriate usage limits.
+- Uses the player's Roblox avatar appearance.
+- Supports R6/R15 avatar appearance cloning.
+- Creates an AI character near the player.
+- Uses Roblox "Humanoid" / "Animator".
+- Supports basic character animations.
+- Bubble chat responses.
+- "Thinking..." state while waiting for the AI.
 
-🛡️ Backend Abuse Protection
+🧠 AI System
 
-The backend is responsible for protecting the API account from unauthorized or excessive usage.
+- AI-generated responses.
+- Short-term conversation memory.
+- Game context sent to the backend.
+- Player name and AI name awareness.
+- Personality settings.
+- Vietnamese / English language settings.
+- Structured AI responses containing:
+  - "reply"
+  - "action"
 
-At minimum, production deployments should use:
+🎮 Actions
 
-- Rate limiting
-- Request/payload size limits
-- Input validation
-- Request timeouts
-- Token/output limits
-- Error handling
-- No API-key logging
-- Appropriate authentication or per-user/session restrictions where possible
+The current client-side action system supports:
 
-Important: Hiding the OpenAI API key does not automatically make the backend secure. If the backend endpoint is publicly accessible without authentication or sufficient rate limiting, other people may be able to abuse it and consume the owner's API quota or billing.
+FOLLOW_PLAYER
+STOP
+JUMP
+SIT
+TELEPORT_NEAR
+SAY
+IDLE
 
-🌐 Public GitHub Repository
+Unsupported actions are rejected by the client.
 
-This repository is designed so that the source code can be public without exposing the OpenAI API key.
+🚶 Movement
 
-The public repository should contain:
+- Follow player.
+- Pathfinding.
+- Automatic recovery when stuck.
+- Teleport near the player when the distance becomes too large.
+- Configurable follow distance.
+- Configurable teleport distance.
 
-.env.example       ← safe placeholder
-.gitignore         ← prevents secrets from being committed
-backend/           ← backend source code
-roblox/            ← Roblox LocalScript
-README.md
+💬 UI
 
-The real secret should exist only as:
+- Roblox chat interface.
+- Mobile-friendly layout.
+- PC support.
+- AI toggle button.
+- Settings panel.
+- AI name customization.
+- Personality selection.
+- Language selection.
+- Feedback buttons.
 
-backend/.env
+---
 
-during local development, or as a Secret / Environment Variable provided by the deployment platform in production.
+🏗️ Architecture
 
-Do not publish "backend/.env".
-# Roblox AI Companion
+┌──────────────────────────┐
+│        Roblox Game       │
+│                          │
+│  CONFIG AI V3            │
+│  LocalScript              │
+└────────────┬─────────────┘
+             │ HTTPS POST
+             ▼
+┌──────────────────────────┐
+│     Render Backend       │
+│                          │
+│  Express + Node.js       │
+│  /api/chat               │
+│                          │
+│  Rate limiting           │
+│  Input validation        │
+│  Request limits          │
+└────────────┬─────────────┘
+             │
+             │ OPENAI_API_KEY
+             ▼
+┌──────────────────────────┐
+│        OpenAI API        │
+│                          │
+│   Backend-selected model │
+└──────────────────────────┘
 
-AI Character đồng hành trong Roblox, sử dụng avatar của người chơi, có animation, pathfinding, follow, bubble chat và chat UI.
+The Roblox client only knows the backend URL.
 
-**Kiến trúc bảo mật:** API key của xAI **không bao giờ** nằm trong Roblox script hay source code public. Tất cả request đi qua Secure Backend Proxy.
+The OpenAI API key stays on the backend.
 
-## Tính năng chính
+---
 
-- Clone appearance (avatar) của người chơi (R6/R15)
-- Animation đầy đủ: Idle, Walk, Run, Jump, Fall, Climb, Sit...
-- Pathfinding + Follow player thông minh
-- Tự động teleport khi khoảng cách > 60 studs
-- Phát hiện bị kẹt và tự phục hồi
-- Bubble Chat + trạng thái "Đang suy nghĩ..."
-- Chat UI responsive (PC + Mobile)
-- Action system an toàn (FOLLOW, STOP, JUMP, SIT...)
-- Memory hội thoại ngắn hạn
-- Backend bảo mật với rate limit + validation
+📁 Project Structure
 
-## Kiến trúc
-Roblox LocalScript
+Forget-AI/
 │
-│  HTTPS (chỉ biết BACKEND_URL)
-▼
-Secure Backend Proxy
-│
-│  XAI_API_KEY (Environment Variable / Secret)
-▼
-xAI API (https://api.x.ai/v1)
-API key chỉ tồn tại ở phía server.
-Không hard-code, không Base64, không obfuscate, không lưu trong client.
-
-Cấu trúc thư mục
-
-roblox-ai-companion/
-├── .gitignore
-├── .env.example
-├── README.md
 ├── backend/
 │   ├── package.json
 │   └── server.js
-└── roblox/
-└── AICompanion.client.lua
+│
+├── roblox/
+│   └── CONFIG AI V3
+│
+├── .env.example
+├── .gitignore
+├── Error
+└── README.md
 
-1. Triển khai Backend (Bắt buộc)
+---
 
-Yêu cầu
+🔐 Security
 
-Node.js 18+
+Never put your OpenAI API key inside the Roblox script.
 
-Tài khoản Render, Railway hoặc tương tự
+Do NOT:
 
+- Hard-code the API key in Lua.
+- Put the key in a public GitHub repository.
+- Put the key inside JSON files.
+- Put the key inside frontend/client code.
+- Encode the key with Base64.
+- Obfuscate the key.
+- Split the key into multiple strings.
+- Store the real key inside ".env.example".
 
-Cách làm nhanh với Render
+The real key should only exist as an environment variable/secret on the backend.
 
-1. Fork / clone repo này lên GitHub của bạn.
+For local development:
 
+backend/.env
 
-2. Vào Render.com → New → Web Service.
+For Render:
 
+Environment Variables
 
-3. Connect GitHub repository.
+If a real API key is ever exposed publicly, revoke it and create a new one.
 
+---
 
-4. Cấu hình:
+⚙️ Backend
 
-Root Directory: backend
+The backend is located at:
 
-Build Command: npm install
+backend/server.js
 
-Start Command: npm start
+It uses:
 
+- Node.js
+- Express
+- OpenAI SDK
+- Helmet
+- CORS
+- Express Rate Limit
+- dotenv
 
+The backend does not allow the Roblox client to select the AI model.
 
-5. Thêm Environment Variables (Secrets):
+The model is configured on the backend using:
 
+OPENAI_MODEL
 
+If it is not specified, the backend defaults to:
 
-Key	Value	Ghi chú
+gpt-5.6-luna
 
-XAI_API_KEY	your_new_xai_api_key	Key mới từ console.x.ai
-PORT	10000	Render tự set
-RATE_LIMIT_MAX	15	Request / phút
+---
 
+🌐 API Endpoints
 
-6. Deploy → copy URL (ví dụ: https://your-app.onrender.com)
+Health
 
+GET /health
 
+Example:
 
-Chạy local (để test)
+https://forget-ai.onrender.com/health
 
-cd backend  
-cp ../.env.example .env  
-# Sửa .env và điền XAI_API_KEY  
-npm install  
-npm start  
-2. Cài đặt trong Roblox  
-Mở Roblox Studio.  
-Vào StarterPlayer → StarterPlayerScripts.  
-Tạo LocalScript tên AICompanion.  
-Copy toàn bộ nội dung file roblox/AICompanion.client.lua vào.  
-Sửa dòng cấu hình:  
-BACKEND_URL = "https://your-app.onrender.com/api/chat", -- ← URL backend của bạn  
-Bật HTTP Requests:  
-Game Settings → Security → Allow HTTP Requests = ✅  
-Play để test.  
-Lưu ý: Bạn cũng có thể dùng cho exexutor của bạn
-3. Bảo mật quan trọng  
-Không bao giờ commit file .env.  
-File .env.example chỉ chứa placeholder.  
-Nếu bạn từng đưa API key vào code trước đây → Revoke key cũ ngay tại console.x.ai và tạo key mới.  
-Backend có:  
-Rate limiting  
-Payload size limit  
-Input validation  
-Timeout  
-Không log API key  
-4. Cách sử dụng trong game  
-Vào game → AI Character sẽ spawn gần bạn (dùng avatar của bạn).  
-Bấm nút 🤖 góc phải dưới để mở chat.  
-Ví dụ lệnh:  
-Đi theo tôi → AI follow  
-Dừng lại → dừng  
-Nhảy đi → nhảy  
-Ngồi xuống → ngồi  
-Hỏi bất kỳ câu gì → AI trả lời + bubble chat  
-5. Lưu ý kỹ thuật  
-Script hiện tại là LocalScript (client-side).  
-Pathfinding + animation chạy trên client.  
-Với game multiplayer lớn, nên chuyển logic AI Character sang ServerScript + RemoteEvent để đồng bộ tốt hơn.  
-Model grok-4.5 hoặc grok-4.6 (tùy xAI hỗ trợ tại thời điểm bạn dùng).  
-License  
-MIT (hoặc license bạn muốn)  
-Cảnh báo cuối:  
-API key thật chỉ được đặt trong Environment Variables / Secrets của nền tảng deploy.  
-Nếu lộ key → chi phí API có thể bị lạm dụng.  
----  
-  
-### Tóm tắt nhanh bạn cần làm:  
-  
-1. Tạo file `README.md` ở root repo.  
-2. Paste nội dung trên vào.  
-3. Sửa các chỗ `your-app.onrender.com` thành URL thật của bạn sau khi deploy.  
-4. Commit & push.
+A successful response looks similar to:
 
-   Lưu ý: có thể dùng cả API KEY của OpenAi chứ không chỉ riêng xAi
-do khá lười nên tôi nhờ hai AI (GPT và Grok) viết ReadMe. Mong bạn thông cảm;)
+{
+  "ok": true,
+  "service": "roblox-ai-proxy",
+  "model": "gpt-5.6-luna"
+}
+
+Compatibility Health Check
+
+GET /api/healthz
+
+Chat
+
+POST /api/chat
+
+The Roblox client sends:
+
+{
+  "message": "Đi theo tôi",
+  "playerId": "123456789",
+  "context": "{\"playerName\":\"Player\",\"distance\":8}"
+}
+
+The backend returns:
+
+{
+  "ok": true,
+  "reply": "{\"reply\":\"Được, tôi đi theo bạn!\",\"action\":\"FOLLOW_PLAYER\"}"
+}
+
+The Roblox client then parses the AI's structured response and executes the validated action.
+
+---
+
+🚀 Deploy with Render
+
+Requirements
+
+- GitHub repository
+- Render account
+- OpenAI API key
+- Node.js 18+
+
+Create a new Web Service on Render and connect this repository.
+
+Use:
+
+Root Directory:
+backend
+
+Build command:
+
+npm install
+
+Start command:
+
+npm start
+
+Environment Variables
+
+Add:
+
+OPENAI_API_KEY=your_real_api_key
+OPENAI_MODEL=gpt-5.6-luna
+
+Optional:
+
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=20
+ALLOWED_ORIGINS=*
+
+Render provides the "PORT" environment variable automatically.
+
+Do not commit your real environment variables to GitHub.
+
+---
+
+🎮 Roblox Installation
+
+Open:
+
+Roblox Studio
+→ StarterPlayer
+→ StarterPlayerScripts
+
+Create a:
+
+LocalScript
+
+Then copy the contents of:
+
+roblox/CONFIG AI V3
+
+into the LocalScript.
+
+---
+
+🌐 Backend URL
+
+The current Forget-AI backend is:
+
+https://forget-ai.onrender.com
+
+The Roblox script currently uses:
+
+BACKEND_URL = "https://forget-ai.onrender.com/api/chat"
+
+You can replace this with your own backend URL if you deploy your own instance.
+
+---
+
+⚠️ Roblox HTTP Requests
+
+Your Roblox experience must allow HTTP requests.
+
+Go to:
+
+Game Settings
+→ Security
+→ Allow HTTP Requests
+
+Enable it.
+
+Without HTTP requests, the Roblox client cannot communicate with the backend.
+
+---
+
+🧠 Personalization
+
+The companion supports:
+
+Personality
+
+Vui vẻ
+Nghiêm túc
+Hài hước
+Hỗ trợ
+Trung lập
+
+Language
+
+Tiếng Việt
+English
+
+AI Name
+
+You can customize the displayed AI name from the settings UI.
+
+The current script stores personalization locally through a Roblox Player Attribute.
+
+This is not a server database.
+
+If persistent cross-session storage is required, the project should later use a server-side DataStore system.
+
+---
+
+🧩 Current AI Action System
+
+The AI is instructed to return a JSON object:
+
+{
+  "reply": "Được, tôi đi theo bạn!",
+  "action": "FOLLOW_PLAYER"
+}
+
+The client validates the action against its allowed action list before executing it.
+
+Example:
+
+"Đi theo tôi"
+        ↓
+FOLLOW_PLAYER
+        ↓
+AI starts following the player
+
+Another example:
+
+"Nhảy đi"
+        ↓
+JUMP
+        ↓
+AI jumps
+
+---
+
+🛡️ Backend Protection
+
+The backend currently includes:
+
+- API-key protection through environment variables.
+- Rate limiting.
+- Request body size limits.
+- Message length limits.
+- Context length limits.
+- Player ID length limits.
+- OpenAI request timeout.
+- Input validation.
+- Helmet security headers.
+- Error handling.
+- No API key logging.
+- No player message logging.
+- No AI response logging.
+
+The backend also prevents the client from selecting a different model.
+
+---
+
+⚠️ Important Limitations
+
+The current companion is primarily client-side.
+
+That means:
+
+AI Character
+Pathfinding
+Animation
+UI
+Actions
+
+are handled by the Roblox client.
+
+For a fully synchronized multiplayer AI visible and controllable by everyone, the architecture should eventually move the AI character and authoritative actions to the server using:
+
+ServerScript
++
+RemoteEvent
+
+The current version is mainly intended as a client-side AI Companion prototype.
+
+---
+
+🧪 Troubleshooting
+
+AI does not respond
+
+Check:
+
+1. HTTP Requests are enabled.
+2. "BACKEND_URL" is correct.
+3. Render service is running.
+4. "/health" works.
+5. OpenAI API key is configured on Render.
+6. Roblox Output for HTTP errors.
+
+Test:
+
+https://forget-ai.onrender.com/health
+
+---
+
+"Endpoint not found"
+
+Opening:
+
+https://forget-ai.onrender.com/
+
+is expected to return:
+
+{
+  "ok": false,
+  "error": "Endpoint not found."
+}
+
+The root endpoint is not the API.
+
+Use:
+
+/health
+
+for health checks.
+
+Use:
+
+/api/chat
+
+for AI requests.
+
+---
+
+💳 API Costs
+
+OpenAI API usage may incur charges depending on the account, billing configuration, model, and usage.
+
+Do not assume that having access to ChatGPT means the API is free.
+
+If you make the backend public, use appropriate rate limits and monitor API usage.
+
+---
+
+📜 Credit
+
+The Roblox companion script is intentionally not obfuscated.
+
+If you use the project or its ideas, please give appropriate credit.
+
+Original author:
+
+bebeomatnick / Ng'ĐzBthg
+TikTok: Ng'ĐzBthg
+
+Please do not remove the original credit from the script.
+
+---
+
+📄 License
+
+This project currently does not include a dedicated license file.
+
+If you want other people to freely reuse, modify, and redistribute the project, consider adding an explicit open-source license such as MIT.
+
+Until a license is added, GitHub visibility does not automatically grant permission to reuse the code.
+
+---
+
+❤️ About
+
+Forget-AI is an experiment to bring a real AI companion into Roblox.
+
+The goal is to make an AI character that does more than simply return text:
+
+Talk
+  ↓
+Understand
+  ↓
+Observe game context
+  ↓
+Choose an action
+  ↓
+Move / follow / jump / sit
+  ↓
+Respond naturally
+
+This project is still evolving.
+
+REAL AI IN ROBLOX!!! 🤖🔥
+
+---
+
+Repository
+
+https://github.com/bebeomatnick11/Forget-AI
+
+Backend:
+
+https://forget-ai.onrender.com
